@@ -38,6 +38,12 @@ frontend/.vite/
 # Test coverage
 coverage/
 
+# Vercel
+.vercel/
+
 # Temp files
 /tmp/
 *.tmp
+
+# Claude local settings (personal permissions, not for repo)
+.claude/settings.local.json

@@ -36,8 +36,23 @@ app.use(helmet({
 }));
 
 // ── CORS ────────────────────────────────────────────────────────
+// Build allowed origins list: configured URL + automatic Vercel preview URLs
+const allowedOrigins = new Set<string>([env.FRONTEND_URL]);
+if (process.env.VERCEL_URL) {
+  allowedOrigins.add(`https://${process.env.VERCEL_URL}`);
+}
+// Allow any *.vercel.app subdomain for preview deployments
+const vercelPreviewRegex = /^https:\/\/[a-z0-9-]+-[a-z0-9]+-[a-z0-9]+\.vercel\.app$/;
+
 app.use(cors({
-  origin: env.FRONTEND_URL,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.has(origin) || vercelPreviewRegex.test(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

@@ -3,6 +3,7 @@ import {
   Star, Copy, MoreVertical, Edit, Trash2, RotateCcw, Trash,
   LogIn, FileText, CreditCard, User, Terminal, Check
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { VaultItem, ItemType } from '../../types';
 import { Badge } from '../ui/Badge';
 import { useVaultStore } from '../../store/vaultStore';
@@ -16,7 +17,7 @@ interface VaultItemCardProps {
   isTrash?: boolean;
 }
 
-const itemTypeConfig: Record<ItemType, { icon: React.FC<{ size?: number; className?: string }>; color: string; label: string }> = {
+const itemTypeConfig: Record<ItemType, { icon: LucideIcon; color: string; label: string }> = {
   login: { icon: LogIn, color: 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400', label: 'Login' },
   note: { icon: FileText, color: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-600 dark:text-yellow-400', label: 'Note' },
   card: { icon: CreditCard, color: 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400', label: 'Card' },
