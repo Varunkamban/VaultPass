@@ -60,6 +60,36 @@ export const Login: React.FC = () => {
             {mfaRequired ? 'Two-Factor Verification' : 'Sign in to your vault'}
           </h2>
 
+          {/* Microsoft SSO button — only shown on the main login step */}
+          {!mfaRequired && (
+            <>
+              <a
+                href="/api/v1/auth/oauth/microsoft"
+                className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                {/* Official Microsoft "four-squares" logo */}
+                <svg width="20" height="20" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="1"  y="1"  width="9" height="9" fill="#F25022" />
+                  <rect x="11" y="1"  width="9" height="9" fill="#7FBA00" />
+                  <rect x="1"  y="11" width="9" height="9" fill="#00A4EF" />
+                  <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
+                </svg>
+                Sign in with Microsoft
+              </a>
+
+              <div className="relative my-5">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200 dark:border-gray-700" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="px-3 text-xs text-gray-400 bg-white dark:bg-gray-900">
+                    or continue with email
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {!mfaRequired ? (
               <>

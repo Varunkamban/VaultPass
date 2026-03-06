@@ -20,6 +20,11 @@ export interface User {
   last_login_at: Date | null;
   account_status: AccountStatus;
   is_admin: boolean;
+  // Microsoft SSO fields (added in migration 003)
+  auth_provider: 'local' | 'microsoft';
+  microsoft_oid: string | null;
+  microsoft_tid: string | null;
+  sso_vault_secret: string | null;
 }
 
 export interface VaultItem {

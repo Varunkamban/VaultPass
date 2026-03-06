@@ -1,9 +1,14 @@
 import { Router } from 'express';
 import authController from './auth.controller';
+import * as oauthController from './oauth.controller';
 import { authenticate } from '../../middleware/auth';
 import { loginLimiter, registrationLimiter, passwordResetLimiter } from '../../middleware/rateLimiter';
 
 const router = Router();
+
+// ── Microsoft SSO routes (browser redirects — no auth middleware) ─────────────
+router.get('/oauth/microsoft', oauthController.initiateOAuth);
+router.get('/oauth/microsoft/callback', oauthController.handleCallback);
 
 // Public routes
 router.post('/register', registrationLimiter, authController.register.bind(authController));

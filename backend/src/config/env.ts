@@ -19,4 +19,8 @@ export const env = {
   JWT_REFRESH_EXPIRES_IN: getEnvVar('JWT_REFRESH_EXPIRES_IN', '7d'),
   FRONTEND_URL: getEnvVar('FRONTEND_URL', 'http://localhost:5173'),
   BCRYPT_ROUNDS: parseInt(getEnvVar('BCRYPT_ROUNDS', '12'), 10),
+  // Microsoft SSO (Azure AD / Microsoft Entra ID)
+  MICROSOFT_CLIENT_ID: getEnvVar('MICROSOFT_CLIENT_ID', ''),
+  MICROSOFT_CLIENT_SECRET: getEnvVar('MICROSOFT_CLIENT_SECRET', ''),
+  MICROSOFT_REDIRECT_URI: getEnvVar('MICROSOFT_REDIRECT_URI', 'http://localhost:5000/api/v1/auth/oauth/microsoft/callback'),
 };

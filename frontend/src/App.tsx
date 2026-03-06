@@ -9,6 +9,7 @@ import { Generator } from './pages/Generator';
 import { Settings } from './pages/Settings';
 import { Admin } from './pages/Admin';
 import Security from './pages/Security';
+import OAuthCallback from './pages/OAuthCallback';
 import AutoLock from './components/security/AutoLock';
 import { useAuthStore } from './store/authStore';
 import { useVaultStore } from './store/vaultStore';
@@ -69,6 +70,9 @@ const AppRoutes: React.FC = () => {
   return (
     <>
       <Routes>
+        {/* Public OAuth callback — must not redirect away when authenticated */}
+        <Route path="/auth/callback" element={<OAuthCallback />} />
+
         <Route path="/login" element={
           isAuthenticated ? <Navigate to="/vault" replace /> : <Login />
         } />

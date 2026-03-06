@@ -11,6 +11,7 @@ export interface User {
   account_status: AccountStatus;
   kdf_salt: string;
   kdf_iterations: number;
+  auth_provider: 'local' | 'microsoft';
 }
 
 export interface VaultItem {

@@ -13,6 +13,8 @@ interface AuthState {
   logout: () => Promise<void>;
   loadUser: () => Promise<void>;
   setUser: (user: User) => void;
+  /** Called by OAuthCallback after Microsoft SSO completes */
+  loginWithSSO: (user: User, masterKey: CryptoKey) => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -95,4 +97,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   setUser: (user: User) => set({ user }),
+
+  loginWithSSO: (user: User, masterKey: CryptoKey) => {
+    set({ user, masterKey, isAuthenticated: true, isLoading: false });
+  },
 }));

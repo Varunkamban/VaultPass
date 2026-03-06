@@ -446,6 +446,98 @@ export class AuthService {
       [ip, userId]
     );
   }
+
+  // ─── Microsoft SSO Login / Register ───────────────────────────
+  // Called after the OAuth2 code exchange completes successfully.
+  // Finds an existing SSO user by OID, or creates a new account.
+  // Returns an error code string (no throw) when the email conflicts with a local account.
+  async ssoLogin(
+    microsoftOid: string,
+    microsoftTid: string,
+    email: string,
+    deviceInfo: Record<string, unknown> = {}
+  ): Promise<
+    | { error: 'EMAIL_EXISTS' }
+    | {
+        error: null;
+        user: Record<string, unknown>;
+        accessToken: string;
+        refreshToken: string;
+        ssoVaultSecret: string;
+        kdfSalt: string;
+        kdfIterations: number;
+      }
+  > {
+    const ip = (deviceInfo as { ip?: string }).ip || null;
+    const ua = (deviceInfo as { userAgent?: string }).userAgent || null;
+    const normalEmail = email.toLowerCase();
+
+    // 1. Look up by stable Microsoft OID first
+    let userRow = (
+      await query(
+        `SELECT id, email, is_admin, account_status, kdf_salt, kdf_iterations,
+                sso_vault_secret, auth_provider
+         FROM users WHERE microsoft_oid = $1`,
+        [microsoftOid]
+      )
+    ).rows[0];
+
+    if (!userRow) {
+      // 2. No OID match — check if the email belongs to a LOCAL account
+      const byEmail = await query(
+        `SELECT auth_provider FROM users WHERE email = $1`,
+        [normalEmail]
+      );
+      if (byEmail.rows.length > 0 && byEmail.rows[0].auth_provider === 'local') {
+        return { error: 'EMAIL_EXISTS' };
+      }
+
+      // 3. Create a brand-new SSO account
+      const kdfSalt = crypto.randomBytes(32).toString('hex');
+      const ssoVaultSecret = crypto.randomBytes(64).toString('hex');
+      // Sentinel auth_hash — never used for login, satisfies NOT NULL constraint
+      const sentinelHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+
+      const inserted = await query(
+        `INSERT INTO users
+           (email, auth_hash, kdf_salt, kdf_iterations, auth_provider, microsoft_oid, microsoft_tid, sso_vault_secret)
+         VALUES ($1, $2, $3, $4, 'microsoft', $5, $6, $7)
+         RETURNING id, email, is_admin, account_status, kdf_salt, kdf_iterations, sso_vault_secret`,
+        [normalEmail, sentinelHash, kdfSalt, 100000, microsoftOid, microsoftTid, ssoVaultSecret]
+      );
+      userRow = inserted.rows[0];
+
+      await this.writeAuditLog(userRow.id, 'SSO_REGISTER', ip, ua, { provider: 'microsoft' });
+    } else {
+      // 4. Existing SSO user — refresh last_login tracking
+      await query(
+        `UPDATE users SET last_login_at = NOW(), last_login_ip = $1 WHERE id = $2`,
+        [ip, userRow.id]
+      );
+      await this.writeAuditLog(userRow.id, 'SSO_LOGIN', ip, ua, { provider: 'microsoft' });
+    }
+
+    const { accessToken, refreshToken } = this.generateTokens(userRow as User);
+    await this.storeSession(userRow.id, refreshToken, deviceInfo);
+
+    return {
+      error: null,
+      user: {
+        id: userRow.id,
+        email: userRow.email,
+        is_admin: userRow.is_admin,
+        account_status: userRow.account_status,
+        auth_provider: 'microsoft',
+        kdf_salt: userRow.kdf_salt,
+        kdf_iterations: userRow.kdf_iterations,
+      },
+      accessToken,
+      refreshToken,
+      ssoVaultSecret: userRow.sso_vault_secret as string,
+      kdfSalt: userRow.kdf_salt as string,
+      kdfIterations: userRow.kdf_iterations as number,
+    };
+  }
 }
 
 export default new AuthService();
