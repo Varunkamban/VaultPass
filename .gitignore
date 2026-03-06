@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment files (NEVER commit these)
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# Build output
+dist/
+build/
+**/dist/
+**/build/
+
+# TypeScript incremental compilation
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Vite cache
+.vite/
+frontend/.vite/
+
+# Test coverage
+coverage/
+
+# Temp files
+/tmp/
+*.tmp
