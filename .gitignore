@@ -44,3 +44,6 @@ coverage/
 # Temp files
 /tmp/
 *.tmp
+
+# Claude local settings (personal permissions, not for repo)
+.claude/settings.local.json
