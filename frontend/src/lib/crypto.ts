@@ -6,8 +6,8 @@ export const generateSalt = (): string => {
   return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
-const hexToBytes = (hex: string): Uint8Array => {
-  const bytes = new Uint8Array(hex.length / 2);
+const hexToBytes = (hex: string): Uint8Array<ArrayBuffer> => {
+  const bytes = new Uint8Array(hex.length / 2) as Uint8Array<ArrayBuffer>;
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
   }
@@ -18,8 +18,8 @@ const bytesToBase64 = (bytes: ArrayBuffer): string => {
   return btoa(String.fromCharCode(...new Uint8Array(bytes)));
 };
 
-const base64ToBytes = (b64: string): Uint8Array => {
-  return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+const base64ToBytes = (b64: string): Uint8Array<ArrayBuffer> => {
+  return Uint8Array.from(atob(b64), c => c.charCodeAt(0)) as Uint8Array<ArrayBuffer>;
 };
 
 export const deriveKey = async (password: string, salt: string, iterations = 100000): Promise<CryptoKey> => {

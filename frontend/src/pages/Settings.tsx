@@ -4,6 +4,7 @@ import {
   ChevronLeft, Shield, Key, Monitor, Smartphone, LogOut,
   Lock, Eye, EyeOff, Clock, RefreshCw, Copy, CheckCircle2
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { useAuthStore } from '../store/authStore';
@@ -176,7 +177,7 @@ export const Settings: React.FC = () => {
     }
   };
 
-  const tabs: { key: Tab; label: string; icon: React.FC<{ size?: number }> }[] = [
+  const tabs: { key: Tab; label: string; icon: LucideIcon }[] = [
     { key: 'security', label: 'Security', icon: Key },
     { key: 'sessions', label: 'Sessions', icon: Monitor },
     { key: 'preferences', label: 'Preferences', icon: Monitor },
