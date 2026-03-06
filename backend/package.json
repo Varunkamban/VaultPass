@@ -8,7 +8,9 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "db:migrate": "ts-node src/database/migrate.ts",
-    "db:migrate2": "ts-node src/database/migrate2.ts"
+    "db:migrate2": "ts-node src/database/migrate2.ts",
+    "db:migrate3": "ts-node src/database/migrate3.ts",
+    "db:migrate:all": "npm run db:migrate && npm run db:migrate2 && npm run db:migrate3"
   },
   "dependencies": {
     "@azure/msal-node": "^5.0.6",
