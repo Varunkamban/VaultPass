@@ -1,16 +1,15 @@
 import { Pool, PoolClient } from 'pg';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
-const isProduction = process.env.NODE_ENV === 'production';
+import { env } from './env';
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: isProduction ? { rejectUnauthorized: false } : false,
-  // Serverless: keep pool small — many concurrent Vercel instances × 20 would exhaust DB limits
-  max: isProduction ? 3 : 20,
-  idleTimeoutMillis: isProduction ? 10000 : 30000,
+  connectionString: env.DATABASE_URL,
+  // Set DB_SSL=true in .env when the PostgreSQL server requires TLS
+  // (e.g. managed cloud DBs like Azure Database for PostgreSQL, Supabase, etc.)
+  // Leave DB_SSL=false (default) for self-hosted servers without SSL configured.
+  ssl: env.DB_SSL ? { rejectUnauthorized: false } : false,
+  // Keep the pool small in production — a single node process uses up to `max` connections
+  max: env.NODE_ENV === 'production' ? 10 : 20,
+  idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
 });
 
@@ -23,7 +22,7 @@ export const query = async (text: string, params?: unknown[]) => {
   const start = Date.now();
   const res = await pool.query(text, params);
   const duration = Date.now() - start;
-  if (process.env.NODE_ENV === 'development') {
+  if (env.NODE_ENV === 'development') {
     console.log('query', { text: text.substring(0, 80), duration, rows: res.rowCount });
   }
   return res;

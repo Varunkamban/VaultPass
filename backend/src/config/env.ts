@@ -11,10 +11,26 @@ const getEnvVar = (name: string, defaultValue?: string): string => {
   return value;
 };
 
+// Build a PostgreSQL connection string from individual DB_* vars.
+// Used when DATABASE_URL is not set directly (e.g. container / server deployments
+// that expose DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME separately).
+const resolveDbUrl = (): string => {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  const host     = process.env.DB_HOST     || 'localhost';
+  const port     = process.env.DB_PORT     || '5432';
+  const user     = encodeURIComponent(process.env.DB_USER     || 'postgres');
+  const password = encodeURIComponent(process.env.DB_PASSWORD || 'password');
+  const name     = process.env.DB_NAME     || 'password_management';
+  return `postgresql://${user}:${password}@${host}:${port}/${name}`;
+};
+
 export const env = {
   NODE_ENV: getEnvVar('NODE_ENV', 'development'),
   PORT: parseInt(getEnvVar('PORT', '5000'), 10),
-  DATABASE_URL: getEnvVar('DATABASE_URL', 'postgresql://postgres:password@localhost:5432/password_management'),
+  // Accepts either DATABASE_URL or individual DB_HOST / DB_PORT / DB_USER / DB_PASSWORD / DB_NAME
+  DATABASE_URL: resolveDbUrl(),
+  // SSL — set DB_SSL=true when the PostgreSQL server requires it (e.g. managed cloud DBs)
+  DB_SSL: (process.env.DB_SSL ?? 'false') === 'true',
   JWT_SECRET: getEnvVar('JWT_SECRET', 'dev-secret-change-in-production-min-32-chars-abc'),
   JWT_REFRESH_SECRET: getEnvVar('JWT_REFRESH_SECRET', 'dev-refresh-secret-change-in-production-min-32'),
   JWT_EXPIRES_IN: getEnvVar('JWT_EXPIRES_IN', '15m'),
