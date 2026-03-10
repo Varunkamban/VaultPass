@@ -1,14 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { Pool } from 'pg';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import { env } from '../config/env';
 
 const runMigration = async () => {
   const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    connectionString: env.DATABASE_URL,
+    ssl: env.DB_SSL ? { rejectUnauthorized: false } : false,
   });
 
   try {
