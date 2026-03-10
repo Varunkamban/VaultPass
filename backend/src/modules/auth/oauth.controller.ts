@@ -1,14 +1,14 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import {
-  ConfidentialClientApplication,
-  Configuration,
-  AuthorizationCodeRequest,
-  AuthorizationUrlRequest,
-} from '@azure/msal-node';
 import { env } from '../../config/env';
 import authService from './auth.service';
+
+// ── Microsoft OAuth2 endpoints (organizations tenant = work/school accounts) ──
+const MS_AUTHORITY = 'https://login.microsoftonline.com/organizations';
+const MS_AUTH_URL  = `${MS_AUTHORITY}/oauth2/v2.0/authorize`;
+const MS_TOKEN_URL = `${MS_AUTHORITY}/oauth2/v2.0/token`;
+const SCOPES       = 'openid profile email';
 
 // ── PKCE helpers ──────────────────────────────────────────────────────────────
 const generateCodeVerifier = (): string =>
@@ -16,21 +16,6 @@ const generateCodeVerifier = (): string =>
 
 const generateCodeChallenge = (verifier: string): string =>
   crypto.createHash('sha256').update(verifier).digest('base64url');
-
-// ── Build a fresh MSAL client for each request (Vercel serverless is stateless)
-const buildMsalClient = (): ConfidentialClientApplication => {
-  const config: Configuration = {
-    auth: {
-      clientId: env.MICROSOFT_CLIENT_ID,
-      authority: 'https://login.microsoftonline.com/organizations',
-      clientSecret: env.MICROSOFT_CLIENT_SECRET,
-    },
-  };
-  return new ConfidentialClientApplication(config);
-};
-
-// ── OAuth scopes ──────────────────────────────────────────────────────────────
-const SCOPES = ['openid', 'profile', 'email'];
 
 // ── Step 1: Redirect browser to Microsoft login ───────────────────────────────
 export const initiateOAuth = async (req: Request, res: Response): Promise<void> => {
@@ -40,28 +25,30 @@ export const initiateOAuth = async (req: Request, res: Response): Promise<void> 
   }
 
   try {
-    const codeVerifier = generateCodeVerifier();
+    const codeVerifier  = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
 
     // Pack code_verifier into a short-lived signed JWT used as the OAuth `state`
-    // parameter.  This is stateless — no DB/Redis needed on serverless.
+    // parameter.  Fully stateless — no DB/Redis/session store needed.
     const state = jwt.sign(
       { codeVerifier, purpose: 'oauth_pkce' },
       env.JWT_SECRET,
       { expiresIn: '10m' }
     );
 
-    const msalClient = buildMsalClient();
-    const authCodeUrlParams: AuthorizationUrlRequest = {
-      scopes: SCOPES,
-      redirectUri: env.MICROSOFT_REDIRECT_URI,
+    // Build the authorization URL manually (no MSAL, fully stateless)
+    const params = new URLSearchParams({
+      client_id:             env.MICROSOFT_CLIENT_ID,
+      response_type:         'code',
+      redirect_uri:          env.MICROSOFT_REDIRECT_URI,
+      response_mode:         'query',
+      scope:                 SCOPES,
       state,
-      codeChallenge,
-      codeChallengeMethod: 'S256',
-    };
+      code_challenge:        codeChallenge,
+      code_challenge_method: 'S256',
+    });
 
-    const authUrl = await msalClient.getAuthCodeUrl(authCodeUrlParams);
-    res.redirect(authUrl);
+    res.redirect(`${MS_AUTH_URL}?${params.toString()}`);
   } catch (err) {
     console.error('[oauth] initiateOAuth error:', err);
     res.redirect(`${env.FRONTEND_URL}/auth/callback?error=OAUTH_INIT_FAILED`);
@@ -73,9 +60,9 @@ export const handleCallback = async (req: Request, res: Response): Promise<void>
   const { code, state, error: oauthError } = req.query as Record<string, string>;
   const frontendCallback = `${env.FRONTEND_URL}/auth/callback`;
 
-  // Microsoft returned an error (user declined, etc.)
+  // Microsoft returned an error (user declined, misconfigured app, etc.)
   if (oauthError) {
-    console.warn('[oauth] Microsoft returned error:', oauthError);
+    console.warn('[oauth] Microsoft returned error:', oauthError, req.query['error_description']);
     res.redirect(`${frontendCallback}?error=OAUTH_FAILED`);
     return;
   }
@@ -85,7 +72,7 @@ export const handleCallback = async (req: Request, res: Response): Promise<void>
     return;
   }
 
-  // ── Verify state JWT (CSRF + PKCE recovery) ──────────────────────────────
+  // ── Verify state JWT (CSRF protection + PKCE code_verifier recovery) ─────
   let codeVerifier: string;
   try {
     const decoded = jwt.verify(state, env.JWT_SECRET) as { codeVerifier: string; purpose: string };
@@ -96,25 +83,51 @@ export const handleCallback = async (req: Request, res: Response): Promise<void>
     return;
   }
 
-  // ── Exchange authorization code for tokens ────────────────────────────────
+  // ── Exchange authorization code for tokens via direct HTTP POST ───────────
+  // Using fetch() directly to Microsoft's token endpoint — no MSAL library.
+  // MSAL requires its own internal per-instance state from getAuthCodeUrl,
+  // which breaks when the client is re-created per request (stateless design).
   try {
-    const msalClient = buildMsalClient();
-    const tokenRequest: AuthorizationCodeRequest = {
-      code,
-      scopes: SCOPES,
-      redirectUri: env.MICROSOFT_REDIRECT_URI,
-      codeVerifier,
-    };
+    const tokenRes = await fetch(MS_TOKEN_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:    new URLSearchParams({
+        grant_type:    'authorization_code',
+        client_id:     env.MICROSOFT_CLIENT_ID,
+        client_secret: env.MICROSOFT_CLIENT_SECRET,
+        code,
+        redirect_uri:  env.MICROSOFT_REDIRECT_URI,
+        code_verifier: codeVerifier,
+        scope:         SCOPES,
+      }).toString(),
+    });
 
-    const tokenResponse = await msalClient.acquireTokenByCode(tokenRequest);
-    if (!tokenResponse) throw new Error('No token response from MSAL');
+    const tokenData = await tokenRes.json() as Record<string, unknown>;
 
-    const claims = tokenResponse.idTokenClaims as Record<string, unknown>;
+    if (!tokenRes.ok || tokenData['error']) {
+      console.error('[oauth] Token exchange failed:', tokenData);
+      res.redirect(`${frontendCallback}?error=OAUTH_FAILED`);
+      return;
+    }
 
-    // Extract stable identifiers from the ID token
+    // ── Decode ID token (trusted — came directly from Microsoft over TLS) ──
+    const idToken = tokenData['id_token'] as string | undefined;
+    if (!idToken) {
+      console.error('[oauth] No id_token in token response');
+      res.redirect(`${frontendCallback}?error=MISSING_ID_TOKEN`);
+      return;
+    }
+
+    // JWT payload is the base64url-encoded middle segment
+    const payloadB64 = idToken.split('.')[1];
+    const claims = JSON.parse(
+      Buffer.from(payloadB64, 'base64url').toString('utf8')
+    ) as Record<string, unknown>;
+
+    // Extract stable identifiers from the ID token claims
     const microsoftOid = claims['oid'] as string | undefined;
     const microsoftTid = claims['tid'] as string | undefined;
-    // Work/school accounts use 'preferred_username'; fallback to 'email' claim
+    // Work/school accounts: 'preferred_username' is the UPN (email-like)
     const microsoftEmail =
       (claims['preferred_username'] as string | undefined) ||
       (claims['email'] as string | undefined);
@@ -130,7 +143,7 @@ export const handleCallback = async (req: Request, res: Response): Promise<void>
       (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0].trim() ||
       req.socket.remoteAddress ||
       null;
-    const userAgent = req.headers['user-agent'] || null;
+    const userAgent  = req.headers['user-agent'] || null;
     const deviceInfo = { ip, userAgent, provider: 'microsoft' };
 
     // ── Find or create VaultPass user ─────────────────────────────────────

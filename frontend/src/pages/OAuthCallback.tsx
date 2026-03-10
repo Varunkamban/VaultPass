@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Shield } from 'lucide-react';
@@ -25,8 +25,15 @@ const OAuthCallback: React.FC = () => {
   const navigate = useNavigate();
   const { loginWithSSO } = useAuthStore();
   const [statusText, setStatusText] = useState('Completing sign-in…');
+  // Guard against React StrictMode's double useEffect invocation in dev.
+  // Without this, the first run clears window.location.hash via replaceState,
+  // then the second run sees an empty hash and shows "Incomplete sign-in data".
+  const hasRun = useRef(false);
 
   useEffect(() => {
+    if (hasRun.current) return;
+    hasRun.current = true;
+
     const handleOAuthCallback = async () => {
       // ── Error path (query param) ──────────────────────────────────────────
       const params = new URLSearchParams(window.location.search);

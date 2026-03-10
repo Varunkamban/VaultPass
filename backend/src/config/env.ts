@@ -1,5 +1,7 @@
 import dotenv from 'dotenv';
-dotenv.config();
+import path from 'path';
+// Use absolute path so this works regardless of the process CWD
+dotenv.config({ path: path.resolve(__dirname, '../../.env'), override: true });
 
 const getEnvVar = (name: string, defaultValue?: string): string => {
   const value = process.env[name] ?? defaultValue;
